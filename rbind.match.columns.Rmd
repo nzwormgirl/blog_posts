@@ -1,0 +1,50 @@
+Most of my work recently has involved downloading large datasets of species occurrences from online databases and attempting to smoodge* them together to create distribution maps for parts of Australia.   Online databases typically have a ridiculous number of columns with obscure names which can make the smoodging process quite difficult.  
+
+For example, I was trying to combine data from two different regions into one file, where one region had 72 columns of data and another region had 75 columns.  Going through and identifying non-matching columns manually would be quite tedious and error-prone, so I created a function that can be used to combine the data from two dataframes, keeping only the columns that have the same names. I'm sure there are other fancier ways of doing this but here's how my function works.
+
+**The basics steps**
+1. Specify the input dataframes
+2. Calculate which dataframe has the greatest number of columns
+3. Identify which columns in the smaller dataframe `match` the columns in the larger dataframe
+4. Create a vector of the column names that occur in both dataframes
+5. Combine the data from both dataframes matching the listed column names using `rbind`
+6. Return the combined data
+
+
+```{r echo=TRUE,tidy=TRUE}
+rbind.match.columns <- function (input1,input2) {
+    n.input1 <- ncol(input1)
+    n.input2 <- ncol(input2)
+    
+    if(n.input2 < n.input1) {
+      TF.names <- which(names(input2) %in% names(input1))
+      column.names <- names(input2[,TF.names])
+      } else {
+        TF.names <- which(names(input1) %in% names(input2))
+        column.names <- names(input1[,TF.names])
+      }
+    
+    return(rbind(input1[,column.names], input2[,column.names]))
+  }
+```
+
+Here's an example of the function in use with some imaginary data.  You'll note that Database One and Two have unequal number of columns (5 versus 6), a number of shared columns (species, latitude, longitude, database) and some unshared columns (method, data.source).
+
+```{r example.data, comment="", echo=FALSE}
+# Database one
+(database.one <- data.frame(species=sample(letters,10, replace=T), latitude= -33 + rnorm(10), longitude= 151 + rnorm(10), method=c("camera trap","live trapping"), database="database.one"))
+
+# Database Two
+(database.two <- data.frame(database="database.two", species=sample(letters,10, replace=T), latitude= -33 + rnorm(10), longitude= 151 + rnorm(10), data.source= c("herbarium","museum"), accuracy = abs(rnorm(10)*10 )))
+```
+
+```{r run.function, echo=TRUE, tidy=TRUE, comment=""}
+rbind.match.columns(database.one, database.two)
+
+```
+
+Running the function gives us a new dataframe with the four shared columns and twenty records, reflecting the combined data.  Awesome!
+
+* A very technical and highly scientific term!
+
+
