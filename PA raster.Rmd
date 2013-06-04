@@ -1,0 +1,62 @@
+I'm working on generating species distribution models at the moment for a few hundred species.  Which means that I'm trying to automate as many steps as possible in R to avoid having to click buttons hundreds of times in ArcView.
+
+One of the tasks that I need to do is to convert presence-only latitude and longitude data into a presence-absence raster for each species.  It seems like this would be something that relatively simple but it took me longer than it should have to figure it out.  So I'm posting my code here so 1) I don't forget how I did it; and 2) because I had someone ask me how to exactly this thing this afternoon and it took me ages to hunt through my poorly organised files to find this piece of code!  So here it is:   
+
+Because I'm a function kinda girl, I wrote this as a function.  It basically goes through three steps:  
+1. Take an existing raster of the area you are interested in `mask.raster` and set the background cells to zero (*absences*).  
+2. `rasterize` the presence points for your species `species.data` and set those cells to one (*presences*).  
+3. Label the new raster by your species names `raster.label` and save it as a new raster.
+
+```{r function, comment="", message=FALSE, highlight=TRUE, tidy=TRUE}
+
+presence.absence.raster <- function (mask.raster,species.data,raster.label="") {
+  require(raster)
+  # set the background cells in the raster to 0
+  mask.raster[!is.na(mask.raster)] <- 0
+  
+  #set the cells that contain points to 1
+  speciesRaster <- rasterize(species.data,mask.raster,field=1)
+    speciesRaster <- merge(speciesRaster,mask.raster)
+    #label the raster
+    names(speciesRaster) <- raster.label
+    return(speciesRaster)
+}
+
+```
+
+Below is an example of how the function works using data on the global distribution of foxes data from the `biomod2` package.
+
+```{r run_function, comment="", message=FALSE, highlight=TRUE, tidy=TRUE}
+library(biomod2)
+
+# read in species point data and extract data for foxes
+mySpecies <- read.csv(system.file("external/species/mammals_table.csv",                                   package="biomod2"), row.names = 1)
+
+species <- "VulpesVulpes"
+
+# extract fox data from larger dataset and keep only the x and y coordinates
+fox.data <- mySpecies[,c("X_WGS84", "Y_WGS84",species)]
+  fox.data <- fox.data[fox.data$VulpesVulpes==1,c("X_WGS84", "Y_WGS84")]
+
+# read in a raster of the world
+myRaster <- raster(system.file( "external/bioclim/current/bio3.grd",package="biomod2"))
+
+# create presence absence raster for foxes
+pa.raster <- presence.absence.raster(mask.raster=myRaster, species.data=fox.data, raster.label=species)
+
+plot(pa.raster, main=names(pa.raster))
+```
+
+In this plot, the presences (1) are shown in green and the absences (0) in light grey.  
+
+
+**Helpful things to remember** *(or things I learnt the hard way)*
+
+1. Make sure your species point data and raster are in the same projection and that they actually overlap!  
+2. Set your desired raster extent and resolution in the `mask.raster` before you get started.  
+3. The species point data that you feed into the function should just be a list of x and y co-ordinates - no species names or abundances or you'll confuse the poor beast and it won't work!
+
+And yes, foxes are also present in Australia where they are a pest.  I guess this map shows their natural range before people started doing silly things.
+
+
+#### Bought to you by the powers of *knitr* & *RWordpress*
