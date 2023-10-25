@@ -1,0 +1,73 @@
+---
+title: "Creating a presence-absence raster from a shapefile"
+author: "Amy Whitehead"
+date: "19/04/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = "")
+```
+
+Bakc in 2013 I published a post with a little function for [creating presence-absence rasters from point data](https://amywhiteheadresearch.wordpress.com/2013/05/27/creating-a-presence-absence-raster-from-point-data/). I was in the midst of creating ~1000 species distribution models for Australian species and I needed something that I could easily automate in R.
+
+Both R and my approach to working with spatial data have changed a lot in the last nine years, particularly with excellent new packages such as [`sf`](https://r-spatial.github.io/sf/) and [`fasterize`](https://cran.r-project.org/web/packages/fasterize/vignettes/using-fasterize.html).  This post is a brief update to a new option for creating presence-absence rasters, prompted by a reader's question.
+
+The steps are essentially the same but I've adopted some new packages (`sf` and `fasterize`) that make life easier.   
+1. Create an sf point data set from a dataframe of point locations using `st_as_sf`.  
+2. Convert the points to polygons using `st_buffer`. This step is necessary as `fasterize` currently doesn't work with points. For this simple example, I've elected to leave my points in WGS84, which means I get a warning that st_buffer doesn't work properly with lat/long data. I could have used `st_transform` to convert it to a different projection before using `st_buffer`.  
+3. Convert the polygons to raster using `fasterize` and then `mask` out the ocean.  
+
+```{r load packages and data}
+require(biomod2)
+require(dplyr)
+require(raster)
+require(fasterize)
+require(sf)
+
+select <- dplyr::select
+ 
+# read in a raster of the world
+world <- raster(system.file( "external/bioclim/current/bio3.grd",package="biomod2"))
+
+# read in species point data and extract data for foxes
+mammals <- read.csv(system.file("external/species/mammals_table.csv", package="biomod2"), 
+                    row.names = 1) 
+
+head(mammals)
+ 
+# extract fox data from larger dataset and keep only the x and y coordinates
+fox_data <- mammals %>% 
+  # keep only the spatial data and foxes
+  select(X_WGS84,Y_WGS84,VulpesVulpes) %>% 
+  # keep only the presence points for foxes
+  filter(VulpesVulpes %in% 1) %>% 
+  # convert to an sf points object projected in WGS84
+  st_as_sf(coords=c("X_WGS84","Y_WGS84"),
+           crs = 4326) %>% 
+  # convert to an sf polygon object by buffering the points
+  st_buffer(1) 
+
+head(fox_data)
+
+```
+
+```{r create presence-absence raster}
+
+fox_raster <- fasterize(fox_data, world,
+                        # select the column to use in the raster
+                        field = "VulpesVulpes",
+                        # set the value of the background points 
+                        background = 0) %>% 
+  # only retain values in non-NA cells in the original raster
+  mask(world)
+
+plot(fox_raster,main="Vulpes vulpes")
+
+```
+
+In this plot, the presences (1) are shown in green and the absences (0) in light grey. Now I could have kept the absences in the original dataset and created the raster without using the mask but I wanted to demonstrate what you would need to do if your dataset doesn't include absence data (which seems to be the most typical scenario).
+
+*Pro tip*: don't forget to check that your species point data and raster are in the same projection and that they actually overlap before you get started. 
+
+Hopefully this is helpful. But, as always, there are many ways to do things in R and this may not be the most efficient method. I'd be interested to know how else folks are doing this sort of thing.
