@@ -8,7 +8,7 @@ all_publications <- get_publications(myId)
 
 cit <- get_citation_history(myId) %>% 
   mutate(year = factor(year),
-         cum_cites = cumsum(cites)) %>% glimpse
+         cum_cites = cumsum(cites)) 
 
 # calculate h-index
 hIndex <- as.data.frame(table(all_publications$cites)) %>% 
@@ -35,4 +35,4 @@ png(paste0('figure/scholar_citations_',myId,'.png'),width=1200,height=600,res=15
 citPlot
 dev.off()
 
-
+message("updated plot")
