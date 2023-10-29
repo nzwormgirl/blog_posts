@@ -19,6 +19,7 @@ hIndex <- as.data.frame(table(all_publications$cites)) %>%
   pull(cumFreq) %>% 
   tail(1)
 
+message("downloaded data")
 
 citPlot <- ggplot(cit,aes(x=year,y=cites))+
   geom_bar(stat='identity',colour="#009bc3",fill="#009bc3")+
